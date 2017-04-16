@@ -1,0 +1,32 @@
+Tweet from: @playerone "@other @rpc-bot start/challege/settle/fight/duel .... (Settle this by Rock Paper Scissor)"
+
+   Capture Tweet ID
+   
+   
+   if @other not inDB....
+     Tweet: @other so @playerone wants to settle this by #RockPaperScissors -  follow @rps to accept challege
+     if follow: [go] (dont really need a retweet.
+
+   if @oth'er is inDB and not optout: [go]
+     Tweet: @other So @playerone wants to settle this by #RockPaperScissors (Is this needed??)
+     DM: @playerone "Challege .... against @other Choose rock, paper or scissors"
+     DM: @other "Challege .... against @playerone Choose rock, paper or scissors"
+
+   if @other is inDB and optout: [go]
+     DM: @playerone "Sorry @other has opted out playing with @rpc. They (@other) need to tweet Opt-in to start playing again"
+
+
+If retweet and follow
+     DM: @playerone "Challege .... against @other Choose rock, paper or scissors"
+     DM: @other "Challege .... against @playerone Choose rock, paper or scissors"
+
+
+   if both @playerone and @other DMed back
+     choose winner
+         Tweet "So @playerone Won (Rock) @other Lost (Scissors) .... #RockPaperScissors http://tweeturl.Challege"
+     or Draw
+         DM Both picked rock. Pick again.
+    
+   
+  if new_player:
+     DM opt-out instuctions anytime
