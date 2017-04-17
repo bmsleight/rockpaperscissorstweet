@@ -1,0 +1,1 @@
+@{{ screen_name }} To play a game of #RockPaperScissors using the wonderful @RPSrobot as the judge. Just Tweet: duel [at]OtherPlayer @RPSrobot #easy

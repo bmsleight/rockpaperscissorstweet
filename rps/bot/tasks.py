@@ -3,12 +3,32 @@ from __future__ import absolute_import, unicode_literals
 from celery import shared_task
 from bot.management.commands._botcommands import *
 from bot.tweepycredentials import *
+from django.db.models import Q
 
 import tweepy
 
-#Just to make the belwo look nicer
+from django.template.loader import render_to_string
+
+#~/rockpaperscissorstweet/rps$ celery -A rps worker -l info
+
+#Just to make the below look nicer
 def trigger(command_list, text):
     return any(command in text.lower() for command in command_list)
+
+#Process Text to find confederate_screen_name and hashtext
+def checkConfederate(text):
+    confederate_screen_name = ''
+    hashtext = ''
+    if text.count('@') > 1:
+        for word in text.rstrip().split(' '):
+            if word: # word not ''
+                if word[0] == '@' and word.lower() != BOTHANDLE:
+                    confederate_screen_name = word[1:].lower() # drop @
+                if word[0] == '#':
+                    hashtext = hashtext + ' ' + word
+    return (confederate_screen_name, hashtext)
+
+############## Incoming from Twitter Stream Non-Blcoking ###############
 
 @shared_task
 def processTaskInComing(user_id, screen_name, text, dm):
@@ -27,49 +47,11 @@ def processTaskInComing(user_id, screen_name, text, dm):
             challege(screen_name, text)
         elif trigger(selection_commands, text) and dm:
             selectedRPSLong(screen_name, text)
-        elif text.lower() in optout_commands and dm:
+        elif text.lower() in selection_commands_short and dm:
             selectedRPS(screen_name, text)
 
 @shared_task
 def processNewTwitterFollow(screen_name):
-    newTwitterFollow(screen_name)
-
-@shared_task
-def processCheckGamesNewFollower(screen_name):
-    checkGamesNewFollower(screen_name)
-
-def returnAPI():
-    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-    auth.secure = True
-    auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
-    api = tweepy.API(auth)
-    return api
-
-@shared_task(rate_limit='400/h')  # reduce to 40
-def getFriendshipWithMe(screen_name):
-    api = returnAPI()    
-    friendships = api.show_friendship(source_screen_name=BOTHANDLE,
-                                     target_screen_name=screen_name)
-    updatePlayerFollows(screen_name, friendships[0].following, friendships[0].followed_by)
-    
-
-@shared_task(rate_limit='40/h')
-def create_friendship(screen_name):
-    api = returnAPI()    
-    api.create_friendship(screen_name=screen_name)
-
-
-
-def optOut(screen_name):
-    print('Opt out Command for: ', screen_name)
-    try:
-        player = Player.objects.get(screen_name=screen_name)
-    except Player.DoesNotExist:
-        raise CommandError('Player "%s" does not exist' % screen_name)
-    player.optout = True
-    player.save()
-
-def newTwitterFollow(screen_name):
     print('New twitter follow from: ', screen_name)
     if screen_name.lower() != BOTHANDLE[1:]:
         try:
@@ -85,19 +67,35 @@ def newTwitterFollow(screen_name):
         else:
             checkGamesNewFollower(screen_name)
 
+@shared_task
+def processCheckGamesNewFollower(screen_name):
+    checkGamesNewFollower(screen_name)
+
+############## Other Tasks Spawned from the Non-Blockers ###############
+
+
+def optOut(screen_name):
+    print('Opt out Command for: ', screen_name)
+    try:
+        player = Player.objects.get(screen_name=screen_name)
+    except Player.DoesNotExist:
+        raise CommandError('Player "%s" does not exist' % screen_name)
+    player.optout = True
+    player.save()
+
 def checkGamesNewFollower(screen_name):
     try:
         player = Player.objects.get(screen_name=screen_name)
-        games = Game.objects.filter(player_instigator=player, bot_has_issued_challege=False)
-        for game in games:
-            if game.player_confederate.followed_by:
-                #If other party follows - then both follows so send out challege
-                issueChallegeByDM(game)
-        games = Game.objects.filter(player_confederate=player, bot_has_issued_challege=False)
-        for game in games:
-            if game.player_instigator.followed_by:
-                #If other party follows - then both follows so send out challege
-                issueChallegeByDM(game)
+        try:
+            games = Game.objects.filter(
+                Q(bot_has_issued_challege=False), 
+                Q(player_instigator=player) | Q(player_confederate=player) 
+                )
+            for game in games:
+                if game.player_instigator.followed_by and game.player_confederate.followed_by:
+                    issueChallegeByDM(game)
+        except Game.DoesNotExist:
+            pass # Just following no games yet
     except Player.DoesNotExist:
         print('checkGamesNewFollower - Player.DoesNotExist')
 
@@ -106,7 +104,6 @@ def issueChallegeByDM(game):
     game.save()
     directMessage(game.player_instigator.screen_name, template='dm-challege.txt')
     directMessage(game.player_confederate.screen_name, template='dm-challege.txt')    
-
 
 def challege(screen_name, text):
     print('Challege Command for: ', screen_name)
@@ -183,26 +180,143 @@ def updatePlayerFollows(screen_name, following, followed_by):
 
 def selectedRPSLong(screen_name, text):
     print('In long form selected rps')
+    if text.lower() == 'rock':
+        selectedRPS(screen_name, 'R')
+    elif text.lower() == 'paper':
+        selectedRPS(screen_name, 'P')
+    elif text.lower() == 'scissors':
+        selectedRPS(screen_name, 'S')        
 
 def selectedRPS(screen_name, text):
     print('Selected rps')
+    rpc = text.upper()
+    # Select the right game
+    try:
+        player = Player.objects.get(screen_name=screen_name)
+    except Player.DoesNotExist:
+        print('selectedRPS - Player somehow does not exist') 
+    try:
+        game = Game.objects.filter(
+            Q(bot_has_issued_challege=True), 
+            Q(settled=False),
+            Q(player_instigator=player) | Q(player_confederate=player) 
+            )[0]
+        if game.player_instigator == player:
+            game.instigator_rpc = rpc
+        if game.player_confederate == player:
+            game.confederate_rpc = rpc
+        game.save()
+        if game.instigator_rpc != 'N' and game.confederate_rpc != 'N':
+            processGameWhoWon(game)        
+    except Game.DoesNotExist:
+        directMessage(screen_name, template='dm-no-game-in-progress.txt')
 
+def processGameWhoWon(game):
+    draw = False
+    if game.instigator_rpc == 'R':
+        if game.confederate_rpc == 'R':
+            draw = True
+        elif game.confederate_rpc == 'P':
+            game.instigator_won = False
+        elif game.confederate_rpc == 'S':
+            game.instigator_won = True
+    elif game.instigator_rpc == 'P':
+        if game.confederate_rpc == 'R':
+            game.instigator_won = True
+        elif game.confederate_rpc == 'P':
+            draw = True
+        elif game.confederate_rpc == 'S':
+            game.instigator_won = False
+    elif game.instigator_rpc == 'S':
+        if game.confederate_rpc == 'R':
+            game.instigator_won = False
+        elif game.confederate_rpc == 'P':
+            game.instigator_won = True
+        elif game.confederate_rpc == 'S':
+            draw = True
+    if draw:
+        game.draws = game.draws + 1
+        game.instigator_rp = 'N'
+        game.confederate_rpc = 'N'
+        game.save()
+        directMessage(game.player_instigator.screen_name, template='dm-draw.txt')
+        directMessage(game.player_confederate.screen_name, template='dm-draw.txt')        
+    else:
+        game.settled = True
+        game.save()
+        messageGameOutCome(
+            game.player_instigator.screen_name, game.get_instigator_rpc_display(), 
+            game.player_confederate.screen_name, game.get_confederate_rpc_display(),
+            game.instigator_won, game.hashtext
+            )
+
+def messageGameOutCome(
+            instigator_screen_name, instigator_rpc, 
+            confederate_screen_name, confederate_rpc,
+            instigator_won, hashtext):
+    if instigator_won:
+        statusMessage(
+            template='outcome-game-won.txt',
+            winner_screen_name=instigator_screen_name,
+            winner_rpc = instigator_rpc,
+            loser_screen_name=confederate_screen_name,
+            loser_rpc=confederate_rpc,
+            hashtext=hashtext)
+    else:
+        statusMessage(
+            template='outcome-game-won.txt',
+            winner_screen_name=instigator_screen_name,
+            winner_rpc = confederate_rpc,
+            loser_screen_name=instigator_screen_name,
+            loser_rpc=instigator_rpc,
+            hashtext=hashtext)
+
+################# Prep Messages before Tweepy ##########################
+
+def statusMessage(**kwargs):
+    rendered = render_to_string(kwargs['template'], context=kwargs)
+    print(rendered)
+    update_status.delay(rendered)
 
 def atMessage(screen_name, template):
-    print('@: ', screen_name, ' Using template: ', template)
+    rendered = render_to_string(template, {'screen_name': screen_name})
+    print(rendered)
+    update_status.delay(rendered)
 
 def directMessage(screen_name, template):
-    print('DM to: ', screen_name, ' Using template: ', template)
+    rendered = render_to_string(template, {'screen_name': screen_name})
+    print(rendered)
+    dm.delay(screen_name, rendered)
     # delay and kargs
 
-def checkConfederate(text):
-    confederate_screen_name = ''
-    hashtext = ''
-    if text.count('@') > 1:
-        for word in text.rstrip().split(' '):
-            if word: # word not ''
-                if word[0] == '@' and word.lower() != BOTHANDLE:
-                    confederate_screen_name = word[1:].lower() # drop @
-                if word[0] == '#':
-                    hashtext = hashtext + ' ' + word
-    return (confederate_screen_name, hashtext)
+
+################# Tweepy Stuff Outgoing ################################
+
+def returnAPI():
+    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
+    auth.secure = True
+    auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
+    api = tweepy.API(auth)
+    return api
+
+@shared_task(rate_limit='400/h')  # reduce to 40
+def getFriendshipWithMe(screen_name):
+    api = returnAPI()    
+    friendships = api.show_friendship(source_screen_name=BOTHANDLE,
+                                     target_screen_name=screen_name)
+    updatePlayerFollows(screen_name, friendships[0].following, friendships[0].followed_by)
+
+@shared_task(rate_limit='40/h')
+def create_friendship(screen_name):
+    api = returnAPI()    
+    api.create_friendship(screen_name=screen_name)
+
+@shared_task(rate_limit='400/h') # reduce to 40
+def dm(screen_name, text):
+    api = returnAPI()    
+    api.send_direct_message(screen_name=screen_name, text=text)
+
+@shared_task(rate_limit='100/h')
+def update_status(text):
+    api = returnAPI()    
+    api.update_status(text=text)
