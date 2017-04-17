@@ -1,13 +1,13 @@
 from django.core.management.base import BaseCommand, CommandError
 from bot.tweepycredentials import *
-from bot.tasks import processTaskInComing
+from bot.tasks import processTaskInComing, processNewTwitterFollow
 import tweepy, json, time
 
 
-def putTwiiterStreamMessageToServer(user_id, screen_name, text, me):
+def putTwiiterStreamMessageToServer(user_id, screen_name, text, me, dm=False):
 #    print(user_id, screen_name, text, me)
     if screen_name != me:
-        processTaskInComing.delay(user_id, screen_name, text)
+        processTaskInComing.delay(user_id, screen_name, text, dm)
 
 class StdOutListener( tweepy.StreamListener ):
     def __init__( self, me ):
@@ -21,20 +21,31 @@ class StdOutListener( tweepy.StreamListener ):
     def on_data( self, status ):
         # print("Entered on_data()")
         d = json.loads(status)
-        print(d)
+        print('\n')
+        print(d, type(d))
         for key in d.keys():
             if key == 'direct_message':
+                print('DM')
                 putTwiiterStreamMessageToServer(
                   d['direct_message']['sender_id_str'], 
                   d['direct_message']['sender_screen_name'], 
                   d['direct_message']['text'],
-                  self.me)
+                  self.me, 
+                  dm=True)
             if key == 'text':
+                print('text')
                 putTwiiterStreamMessageToServer(
                   d['user']['id_str'], 
                   d['user']['screen_name'], 
-                  d['text'].split(' ', 1)[1],
+                  d['text'],
                   self.me)
+            if key == 'event':
+                print('event')
+                if d['event'] == 'follow':
+                    print('follow')
+                    processNewTwitterFollow.delay(screen_name=d['source']['screen_name'])
+                if d['event'] == 'unfollow':
+                    print('unfollow')
         return True
     def on_error( self, status ):
         print(status)
@@ -63,6 +74,6 @@ class Command(BaseCommand):
     help = 'listen to twitter Stream'
 
     def handle(self, *args, **options):
-        print('Listen to Twitter Steam')
+        print('Listen to Twitter Stream')
         lstream()
         self.stdout.write(self.style.SUCCESS('boo'))

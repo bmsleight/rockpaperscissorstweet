@@ -2,6 +2,7 @@ Tweet from: @playerone "@other @rpc-bot start/challege/settle/fight/duel .... (S
 
    Capture Tweet ID
    
+   if @playerone not inDB...
    
    if @other not inDB....
      Tweet: @other so @playerone wants to settle this by #RockPaperScissors -  follow @rps to accept challege
