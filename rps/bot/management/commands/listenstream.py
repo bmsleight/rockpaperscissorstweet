@@ -47,7 +47,8 @@ class StdOutListener( tweepy.StreamListener ):
 #                    print('event')
                     if d['event'] == 'follow':
                         print('follow')
-                        processNewTwitterFollow.delay(screen_name=d['source']['screen_name'])
+                        if d['source']['screen_name'] != self.me:
+                            processNewTwitterFollow.delay(screen_name=d['source']['screen_name'])
                     if d['event'] == 'unfollow':
                         print('unfollow')
         return True

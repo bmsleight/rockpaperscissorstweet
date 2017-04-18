@@ -1,1 +1,4 @@
-You been challeged to a game of #RockPaperScissors reply with a direct message to me of Rock, Paper or Scissors (or for the lazy: r, p or s)
+You have been challenged to a game of #RockPaperScissors by {{ other_screen_name }}
+I (@RPSrobot) am the Judge of #RockPaperScissors
+Reply to this direct message stating your choice of: 
+Rock, Paper or Scissors (or for the lazy: r, p or s)

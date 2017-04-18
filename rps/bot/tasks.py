@@ -36,7 +36,7 @@ def processTaskInComing(user_id, screen_name, text, dm):
         # Was mentioned in message (or a DM) so wake up!
         print('Was in message UID: ', user_id, 'Screen_name: ', screen_name, 'Text: ', text)
         # Commands
-        challege_commands = ['start', 'challege' 'settle', 'fight', 'duel']
+        challege_commands = ['start', 'fight', 'duel']
         optout_commands = ['optout']
         selection_commands = ['rock', 'paper', 'scissors']
         selection_commands_short = ['r', 'p', 's', 'R', 'P', 'S']
@@ -53,9 +53,9 @@ def processTaskInComing(user_id, screen_name, text, dm):
 @shared_task
 def processNewTwitterFollow(screen_name):
     print('New twitter follow from: ', screen_name)
-    if screen_name.lower() != BOTHANDLE[1:]:
+    if screen_name.lower() != BOTHANDLE[1:].lower():
         try:
-            player = Player.objects.get(screen_name=screen_name)
+            player = Player.objects.get(screen_name__iexact=screen_name)
             player.followed_by = True
             player.optout = False
             player.save()
@@ -77,7 +77,7 @@ def processCheckGamesNewFollower(screen_name):
 def optOut(screen_name):
     print('Opt out Command for: ', screen_name)
     try:
-        player = Player.objects.get(screen_name=screen_name)
+        player = Player.objects.get(screen_name__iexact=screen_name)
     except Player.DoesNotExist:
         raise CommandError('Player "%s" does not exist' % screen_name)
     player.optout = True
@@ -85,7 +85,7 @@ def optOut(screen_name):
 
 def checkGamesNewFollower(screen_name):
     try:
-        player = Player.objects.get(screen_name=screen_name)
+        player = Player.objects.get(screen_name__iexact=screen_name)
         try:
             games = Game.objects.filter(
                 Q(bot_has_issued_challege=False), 
@@ -102,8 +102,8 @@ def checkGamesNewFollower(screen_name):
 def issueChallegeByDM(game):
     game.bot_has_issued_challege = True
     game.save()
-    directMessage(game.player_instigator.screen_name, template='dm-challege.txt')
-    directMessage(game.player_confederate.screen_name, template='dm-challege.txt')    
+    directMessage(screen_name=game.player_instigator.screen_name, template='dm-challege.txt', other_screen_name=game.player_confederate.screen_name)
+    directMessage(screen_name=game.player_confederate.screen_name, template='dm-challege.txt', other_screen_name=game.player_instigator.screen_name)    
 
 def challege(screen_name, text):
     print('Challege Command for: ', screen_name)
@@ -113,10 +113,8 @@ def challege(screen_name, text):
         # We have a confederate
         (new_i, player_instigator) = newPlayer(screen_name)
         (new_c, player_confederate) = newPlayer(confederate_screen_name)
-        if new_i:
-            atMessage(screen_name, 'need-to-follow-to-player.txt')
-        if new_c:
-            atMessage(confederate_screen_name, 'need-to-follow-to-player.txt')
+        if new_i or new_c:
+            statusMessage(screen_name=screen_name, player_confederate=confederate_screen_name, template='need-to-follow-to-player.txt')
         # If no one has opted out....
         if new_i is not None and new_c is not None:
             newGame(player_instigator, player_confederate, hashtext)
@@ -132,8 +130,12 @@ def challege(screen_name, text):
 
 def newPlayer(screen_name):
     print('New Player ?: ', screen_name)
+    #http://stackoverflow.com/a/42764175/5860978 @bmsleight?
+    PERMITTED_CHARS = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+    screen_name = "".join(c for c in screen_name if c in PERMITTED_CHARS)
     try:
-        player = Player.objects.get(screen_name=screen_name)
+        # The player may be lowercase in screen_name but scored correctly in 
+        player = Player.objects.get(screen_name__iexact=screen_name)
         if player.optout:
             return (None, None)
         else:
@@ -161,7 +163,7 @@ def updatePlayerFollows(screen_name, following, followed_by):
     # If new follow then newTwitterFollow
     print('Update Player Followes: ', screen_name, following, followed_by)
     try:
-        player = Player.objects.get(screen_name=screen_name)
+        player = Player.objects.get(screen_name__iexact=screen_name)
         old_followed_by = player.followed_by
         player.followed_by = followed_by
         player.following = following
@@ -192,7 +194,7 @@ def selectedRPS(screen_name, text):
     rpc = text.upper()
     # Select the right game
     try:
-        player = Player.objects.get(screen_name=screen_name)
+        player = Player.objects.get(screen_name__iexact=screen_name)
     except Player.DoesNotExist:
         print('selectedRPS - Player somehow does not exist') 
     try:
@@ -209,7 +211,9 @@ def selectedRPS(screen_name, text):
         if game.instigator_rpc != 'N' and game.confederate_rpc != 'N':
             processGameWhoWon(game)        
     except Game.DoesNotExist:
-        directMessage(screen_name, template='dm-no-game-in-progress.txt')
+        directMessage(screen_name=screen_name, template='dm-no-game-in-progress.txt')
+    except IndexError:
+        print('IndexError') 
 
 def processGameWhoWon(game):
     draw = False
@@ -239,21 +243,21 @@ def processGameWhoWon(game):
         game.instigator_rp = 'N'
         game.confederate_rpc = 'N'
         game.save()
-        directMessage(game.player_instigator.screen_name, template='dm-draw.txt')
-        directMessage(game.player_confederate.screen_name, template='dm-draw.txt')        
+        directMessage(screen_name=game.player_instigator.screen_name, template='dm-draw.txt')
+        directMessage(screen_name=game.player_confederate.screen_name, template='dm-draw.txt')        
     else:
         game.settled = True
         game.save()
         messageGameOutCome(
             game.player_instigator.screen_name, game.get_instigator_rpc_display(), 
             game.player_confederate.screen_name, game.get_confederate_rpc_display(),
-            game.instigator_won, game.hashtext
+            game.instigator_won, game.draws, game.hashtext
             )
 
 def messageGameOutCome(
             instigator_screen_name, instigator_rpc, 
             confederate_screen_name, confederate_rpc,
-            instigator_won, hashtext):
+            instigator_won, draws, hashtext):
     if instigator_won:
         statusMessage(
             template='outcome-game-won.txt',
@@ -261,14 +265,16 @@ def messageGameOutCome(
             winner_rpc = instigator_rpc,
             loser_screen_name=confederate_screen_name,
             loser_rpc=confederate_rpc,
+            draws=draws,
             hashtext=hashtext)
     else:
         statusMessage(
             template='outcome-game-won.txt',
-            winner_screen_name=instigator_screen_name,
+            winner_screen_name=confederate_screen_name,
             winner_rpc = confederate_rpc,
             loser_screen_name=instigator_screen_name,
             loser_rpc=instigator_rpc,
+            draws=draws,
             hashtext=hashtext)
 
 ################# Prep Messages before Tweepy ##########################
@@ -276,17 +282,17 @@ def messageGameOutCome(
 def statusMessage(**kwargs):
     rendered = render_to_string(kwargs['template'], context=kwargs)
     print(rendered)
-    update_status.delay(rendered)
+    update_status.delay(rendered[:140])
 
 def atMessage(screen_name, template):
     rendered = render_to_string(template, {'screen_name': screen_name})
     print(rendered)
-    update_status.delay(rendered)
+    update_status.delay(rendered[:140])
 
-def directMessage(screen_name, template):
-    rendered = render_to_string(template, {'screen_name': screen_name})
+def directMessage(**kwargs):
+    rendered = render_to_string(kwargs['template'], context=kwargs)
     print(rendered)
-    dm.delay(screen_name, rendered)
+    dm.delay(kwargs['screen_name'], rendered)
     # delay and kargs
 
 
@@ -319,4 +325,4 @@ def dm(screen_name, text):
 @shared_task(rate_limit='100/h')
 def update_status(text):
     api = returnAPI()    
-    api.update_status(text=text)
+    api.update_status(status=text)

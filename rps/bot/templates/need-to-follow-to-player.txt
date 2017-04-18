@@ -1,1 +1,1 @@
-To play a game of #RockPaperScissors using the wonderful @RPSrobot as the judge you and your opponent need to follow @RPSrobot
+#RockPaperScissors @{{ screen_name }} Vs. @{{ player_confederate }} with @RPSrobot as referee 1)Follow @RPSrobot 2)Look out for DMs
