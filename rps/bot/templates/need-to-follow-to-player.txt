@@ -1,1 +1,1 @@
-#RockPaperScissors @{{ screen_name }} Vs. @{{ player_confederate }} with @RPSrobot as referee 1)Follow @RPSrobot 2)Look out for DMs
+#RockPaperScissors @{{ screen_name }} V @{{ player_confederate }} with @RPSrobot as referee 1)Follow @RPSrobot 2)Look out for DMs

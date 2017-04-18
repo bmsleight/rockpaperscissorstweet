@@ -23,7 +23,7 @@ def checkConfederate(text):
         for word in text.rstrip().split(' '):
             if word: # word not ''
                 if word[0] == '@' and word.lower() != BOTHANDLE:
-                    confederate_screen_name = word[1:].lower() # drop @
+                    confederate_screen_name = word[1:] # drop @
                 if word[0] == '#':
                     hashtext = hashtext + ' ' + word
     return (confederate_screen_name, hashtext)

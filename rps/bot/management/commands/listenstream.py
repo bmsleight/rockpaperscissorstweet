@@ -80,5 +80,6 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         print('Listen to Twitter Stream')
-        lstream()
-        self.stdout.write(self.style.SUCCESS('boo'))
+        while True: 
+            lstream()
+            self.stdout.write(self.style.SUCCESS('boo'))
