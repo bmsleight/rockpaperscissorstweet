@@ -3,6 +3,12 @@ from __future__ import absolute_import, unicode_literals
 from celery import shared_task
 from bot.management.commands._botcommands import *
 from bot.tweepycredentials import *
+
+from bot.generatevideo import *
+import os
+from tempfile import mkstemp
+from datetime import datetime
+
 from django.db.models import Q
 
 import tweepy
@@ -36,7 +42,7 @@ def processTaskInComing(user_id, screen_name, text, dm):
         # Was mentioned in message (or a DM) so wake up!
         print('Was in message UID: ', user_id, 'Screen_name: ', screen_name, 'Text: ', text)
         # Commands
-        challege_commands = ['start', 'fight', 'duel']
+        challege_commands = ['referee', 'start', 'fight', 'duel']
         optout_commands = ['optout']
         selection_commands = ['rock', 'paper', 'scissors']
         selection_commands_short = ['r', 'p', 's', 'R', 'P', 'S']
@@ -198,18 +204,24 @@ def selectedRPS(screen_name, text):
     except Player.DoesNotExist:
         print('selectedRPS - Player somehow does not exist') 
     try:
-        game = Game.objects.filter(
+        games = Game.objects.filter(
             Q(bot_has_issued_challege=True), 
             Q(settled=False),
             Q(player_instigator=player) | Q(player_confederate=player) 
-            )[0]
-        if game.player_instigator == player:
-            game.instigator_rpc = rpc
-        if game.player_confederate == player:
-            game.confederate_rpc = rpc
-        game.save()
-        if game.instigator_rpc != 'N' and game.confederate_rpc != 'N':
-            processGameWhoWon(game)        
+            ).order_by('id')
+        for game in games:
+            if game.player_instigator == player and game.instigator_rpc == 'N':
+                game.instigator_rpc = rpc
+                game.save()
+                if game.instigator_rpc != 'N' and game.confederate_rpc != 'N':
+                    processGameWhoWon(game)        
+                break
+            if game.player_confederate == player and game.confederate_rpc == 'N':
+                game.confederate_rpc = rpc
+                game.save()
+                if game.instigator_rpc != 'N' and game.confederate_rpc != 'N':
+                    processGameWhoWon(game)        
+                break
     except Game.DoesNotExist:
         directMessage(screen_name=screen_name, template='dm-no-game-in-progress.txt')
     except IndexError:
@@ -240,7 +252,7 @@ def processGameWhoWon(game):
             draw = True
     if draw:
         game.draws = game.draws + 1
-        game.instigator_rp = 'N'
+        game.instigator_rpc = 'N'
         game.confederate_rpc = 'N'
         game.save()
         directMessage(screen_name=game.player_instigator.screen_name, template='dm-draw.txt')
@@ -251,35 +263,64 @@ def processGameWhoWon(game):
         messageGameOutCome(
             game.player_instigator.screen_name, game.get_instigator_rpc_display(), 
             game.player_confederate.screen_name, game.get_confederate_rpc_display(),
-            game.instigator_won, game.draws, game.hashtext
+            game.instigator_won, game.draws, game.hashtext, 
+            game.player_instigator.premium
             )
+        if game.player_instigator.premium > 0:
+            if game.player_instigator.premium == 1:
+                atMessage(screen_name, 'ask-for-money.txt')
+            game.player_instigator.premium = game.player_instigator.premium - 1
+            game.player_instigator.save()
 
 def messageGameOutCome(
             instigator_screen_name, instigator_rpc, 
             confederate_screen_name, confederate_rpc,
-            instigator_won, draws, hashtext):
+            instigator_won, draws, hashtext, premium):
     if instigator_won:
-        statusMessage(
-            template='outcome-game-won.txt',
-            winner_screen_name=instigator_screen_name,
-            winner_rpc = instigator_rpc,
-            loser_screen_name=confederate_screen_name,
-            loser_rpc=confederate_rpc,
-            draws=draws,
-            hashtext=hashtext)
+        if premium >0:
+            statusVideo(
+                template='outcome-game-won.txt',
+                winner_screen_name=instigator_screen_name,
+                winner_rpc = instigator_rpc,
+                loser_screen_name=confederate_screen_name,
+                loser_rpc=confederate_rpc,
+                draws=draws,
+                hashtext=hashtext,
+                instigator_won=instigator_won)
+        else:
+            statusMessage(
+                template='outcome-game-won.txt',
+                winner_screen_name=instigator_screen_name,
+                winner_rpc = instigator_rpc,
+                loser_screen_name=confederate_screen_name,
+                loser_rpc=confederate_rpc,
+                draws=draws,
+                hashtext=hashtext)            
     else:
-        statusMessage(
-            template='outcome-game-won.txt',
-            winner_screen_name=confederate_screen_name,
-            winner_rpc = confederate_rpc,
-            loser_screen_name=instigator_screen_name,
-            loser_rpc=instigator_rpc,
-            draws=draws,
-            hashtext=hashtext)
+        if premium >0:
+            statusVideo(
+                template='outcome-game-won.txt',
+                winner_screen_name=confederate_screen_name,
+                winner_rpc = confederate_rpc,
+                loser_screen_name=instigator_screen_name,
+                loser_rpc=instigator_rpc,
+                draws=draws,
+                hashtext=hashtext,
+                instigator_won=instigator_won)
+        else:
+            statusMessage(
+                template='outcome-game-won.txt',
+                winner_screen_name=confederate_screen_name,
+                winner_rpc = confederate_rpc,
+                loser_screen_name=instigator_screen_name,
+                loser_rpc=instigator_rpc,
+                draws=draws,
+                hashtext=hashtext)
 
 ################# Prep Messages before Tweepy ##########################
 
 def statusMessage(**kwargs):
+    kwargs['date'] = datetime.now().strftime("%Y-%m-%d %H:%M")
     rendered = render_to_string(kwargs['template'], context=kwargs)
     print(rendered)
     update_status.delay(rendered[:140])
@@ -294,6 +335,20 @@ def directMessage(**kwargs):
     print(rendered)
     dm.delay(kwargs['screen_name'], rendered)
     # delay and kargs
+
+def statusVideo(**kwargs):
+    fd, gif = mkstemp(suffix='.gif')
+    rendered = render_to_string(kwargs['template'], context=kwargs)
+    makeVideoRPS(
+            gif_filename = gif,
+            winner_screen_name=kwargs['winner_screen_name'],
+            winner_rpc=kwargs['winner_rpc'],
+            loser_screen_name=kwargs['loser_screen_name'],
+            loser_rpc=kwargs['loser_rpc'],
+            hashtext=kwargs['hashtext'],
+            winner_rhs = kwargs['instigator_won'])
+    print(rendered)
+    update_status_with_media.delay(gif, rendered[:140])
 
 
 ################# Tweepy Stuff Outgoing ################################
@@ -326,3 +381,9 @@ def dm(screen_name, text):
 def update_status(text):
     api = returnAPI()    
     api.update_status(status=text)
+    
+@shared_task(rate_limit='100/h')
+def update_status_with_media(filename, text):
+    api = returnAPI()    
+    api.update_with_media(filename=filename, status=text)
+    os.remove(filename)

@@ -1,1 +1,1 @@
-#RockPaperScissors won by @{{winner_screen_name}} with {{ winner_rpc }} against @{{ loser_screen_name }} with {{ loser_rpc }} after {{ draws }} draws {{ hashtext }}
+#RockPaperScissors won by @{{winner_screen_name}} loser @{{ loser_screen_name }} {{ date }} {{ hashtext }}

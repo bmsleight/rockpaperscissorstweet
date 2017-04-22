@@ -25,7 +25,9 @@ SECRET_KEY = 'ef_7qdfi0y==u51(273)hrevofqsr6-=@fdu(0+gc&cf_#q5n0'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+                'rps.lan',
+]
 
 
 # Application definition
