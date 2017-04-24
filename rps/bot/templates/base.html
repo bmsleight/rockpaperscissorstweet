@@ -1,0 +1,56 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8"/>
+<!--	<link type="image/png" href="{% static "assets/img/logo.png" %}" rel="icon"> -->
+	<title>RPSrobot - Rock Paper Scissors Robot</title>
+</head>
+<body>
+
+<topbar right style="display:none;">
+	<item><a href="./">Home</a></item>
+    <item><a href='https://twitter.com/rpsrobot'>@RPSrobot</a></item>
+	<menu name="Menu">
+		<item><a href="template.html">Left</a></item>
+		<item><a href="template-right.html">Right</a></item>
+		<item><a href="template-mfixed.html">MFixed</a></item>
+		<item><a href="header-test.html">Header Test</a></item>
+		<item><a href="header-test-mfixed.html">Header Test (MFixed)</a></item>
+	</menu>
+	<toc></toc>
+</topbar>
+
+<xmp theme="cyborg" style="display:none;">
+
+{% block content %}
+{% endblock %}
+
+</xmp>
+
+<p>&nbsp;</p>
+
+    <footer class="footer">
+      <div class="container">
+              <div class="well">
+                  <p><small><a href='https://twitter.com/rpsrobot'>@RPSrobot</a> - Play Rock Paper Scissors on twitter 
+                  <a href='https://twitter.com/search?f=tweets&vertical=default&q=%23RockPaperScissors&src=typd'>#RockPaperScissors</a></small></p>
+                <p><small>Made with tools such as <a href='https://www.djangoproject.com/'>Django</a>, 
+                <a href='http://www.tweepy.org/'>Tweepy</a>, <a href='http://strapdownjs.com/'>strapdown</a>, 
+                <a href='http://joedf.ahkscript.org/strapdown-topbar/'>strapdown-topbar </a>, 
+                <a href='http://zulko.github.io/moviepy/'>Movie.py</a></small></p>
+              </div>
+      </div>
+    </footer>
+    
+<!--<script src="http://strapdownjs.com/v/0.2/strapdown.js"></script>-->
+<script src="{% static "assets/js/strapdown.js" %}"></script>
+<!-- Include it AFTER strapdown -->
+<script src="{% static "assets/js/strapdown-topbar.min.js" %}"></script>
+
+<!-- Example: Manually adding a logo -->
+<!-- Include it AFTER EVERYTHING -->
+<!--<script src="{% static "assets/js/logo.js" %}"></script>-->
+
+</body>
+</html>

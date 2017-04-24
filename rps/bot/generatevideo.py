@@ -85,12 +85,12 @@ def main():
     fd, path = mkstemp(suffix='.gif')
     makeVideoRPS(
             gif_filename = path,
-            winner_screen_name='bmsleight',
-            winner_rpc='Scissors',
-            loser_screen_name='AngoranBob',
-            loser_rpc='Paper',
-            hashtext='#Fred',
-            winner_rhs = False)
+            winner_screen_name='Twitter_A',
+            winner_rpc='Rock',
+            loser_screen_name='Twitter_B',
+            loser_rpc='Scissors',
+            hashtext='#Example',
+            winner_rhs = True)
     # Close opened file
     print(path)
     s = input('--> ')
