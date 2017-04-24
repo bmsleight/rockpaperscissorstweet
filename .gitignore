@@ -91,3 +91,7 @@ ENV/
 
 # Ignore Tweepy tweepycredentials
 rps/bot/tweepycredentials.py
+
+# Ignore tmp pid
+rps/celerybeat.pid
+
