@@ -387,3 +387,11 @@ def update_status_with_media(filename, text):
     api = returnAPI()    
     api.update_with_media(filename=filename, status=text)
     os.remove(filename)
+
+############# Tweepy Reverse leacky bucket  ############################
+@shared_task()
+def periodicUpdateRate():
+    now = datetime.now()
+    print('Now: ', now)
+    for p in Player.objects.all():
+        print(p.screen_name)

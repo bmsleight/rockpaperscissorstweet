@@ -1,0 +1,26 @@
+## Things to run
+
+### All from bms@rps:~/rockpaperscissorstweet/rps$
+
+### Listen to Twitter Stream
+./manage.py listenstream
+
+### run beat(er) schedulers; configuration in django admin
+celery -A rps beat -l info  -S django 
+
+### Connect worker to run default tasks
+celery -A rps worker -l info -Q celery
+
+### Connect worker to run periodic tasks
+celery -A rps worker -l info   --concurrency=4 -Q periodic --hostname=periodic@%h
+
+
+
+
+### Monitoring tasks
+celery flower -A rps beat --address=0.0.0.0 --port=5555
+
+
+
+### Run development server
+./manage.py runserver 0.0.0.0:8000

@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'django.contrib.flatpages',
     'bot',
+    'django_celery_beat',
 ]
 
 SITE_ID = 1

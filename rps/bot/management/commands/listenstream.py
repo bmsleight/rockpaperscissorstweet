@@ -37,7 +37,7 @@ class StdOutListener( tweepy.StreamListener ):
                       dm=True)
 #                    print('DMEND')
                 if key == 'text':
-#                   print('text')
+                    print('text')
                     putTwiiterStreamMessageToServer(
                       d['user']['id_str'], 
                       d['user']['screen_name'], 
