@@ -16,7 +16,10 @@ Including another URLconf
 from django.conf.urls import url, include
 from django.contrib import admin
 
+from bot import views
+
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
+    url(r'^chart/', views.chart, name='chart'),
     url(r'', include('django.contrib.flatpages.urls')),
 ]

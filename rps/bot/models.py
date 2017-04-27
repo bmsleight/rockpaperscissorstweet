@@ -32,3 +32,12 @@ class Game(models.Model):
 
     def __str__(self):              # __unicode__ on Python 2
         return self.player_instigator.screen_name + ' vs ' + self.player_confederate.screen_name + ' ' + self.hashtext
+
+class Rate(models.Model):
+    name = models.CharField(max_length=255, help_text='rate_name', unique=True)
+    per_hour = models.IntegerField(default=40, help_text='True Value')
+    current_tokens = models.IntegerField(default=0, help_text='Max is half of api_rate per_hour')
+    last_token_added = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):              # __unicode__ on Python 2
+        return self.name + ' Tokens per hour: ' + str(self.per_hour) + ' Current tokens: ' + str(self.current_tokens) + ' Added at ' + str(self.last_token_added) 

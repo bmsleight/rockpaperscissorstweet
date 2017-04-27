@@ -7,13 +7,19 @@ from bot.tweepycredentials import *
 from bot.generatevideo import *
 import os
 from tempfile import mkstemp
-from datetime import datetime
+from datetime import datetime, timedelta
+from time import sleep
+from django.utils import timezone
 
 from django.db.models import Q
+
+from .models import Game, Player, Rate
 
 import tweepy
 
 from django.template.loader import render_to_string
+
+
 
 #~/rockpaperscissorstweet/rps$ celery -A rps worker -l info
 
@@ -354,44 +360,89 @@ def statusVideo(**kwargs):
 ################# Tweepy Stuff Outgoing ################################
 
 def returnAPI():
+    waitForToken('OAuthHandler')
     auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
     auth.secure = True
     auth.set_access_token(ACCESS_TOKEN, ACCESS_SECRET)
     api = tweepy.API(auth)
     return api
 
-@shared_task(rate_limit='400/h')  # reduce to 40
+@shared_task()
 def getFriendshipWithMe(screen_name):
     api = returnAPI()    
     friendships = api.show_friendship(source_screen_name=BOTHANDLE,
                                      target_screen_name=screen_name)
     updatePlayerFollows(screen_name, friendships[0].following, friendships[0].followed_by)
 
-@shared_task(rate_limit='40/h')
+@shared_task()
 def create_friendship(screen_name):
+    waitForToken('create_friendship')
     api = returnAPI()    
     api.create_friendship(screen_name=screen_name)
 
-@shared_task(rate_limit='400/h') # reduce to 40
+@shared_task() 
 def dm(screen_name, text):
+    waitForToken('send_direct_message')
+    print('send_direct_message')
     api = returnAPI()    
     api.send_direct_message(screen_name=screen_name, text=text)
+    print('senT_direct_message')
 
 @shared_task(rate_limit='100/h')
 def update_status(text):
+    waitForToken('update_status')
     api = returnAPI()    
     api.update_status(status=text)
     
 @shared_task(rate_limit='100/h')
 def update_status_with_media(filename, text):
+    waitForToken('update_status')
     api = returnAPI()    
     api.update_with_media(filename=filename, status=text)
     os.remove(filename)
 
 ############# Tweepy Reverse leacky bucket  ############################
+
+# Avoid it being blocked - http://docs.celeryproject.org/en/latest/userguide/routing.html
+def waitForToken(name):
+    no_token = True
+    print_every_10 = 10
+    while(no_token):
+        try:
+            rate = Rate.objects.get(name__iexact=name)
+            if rate.current_tokens > 0:
+                rate.current_tokens = rate.current_tokens - 1
+                rate.save()
+                no_token = False
+                print('Token taken for ', name)
+        except:
+            print('No Rate with name: ', name)
+            no_token = False
+        if no_token:
+            sleep(1)
+        if print_every_10 == 10 and no_token:
+            print_every_10 = 0
+            print('Rate ..: ', name)
+        else:
+            print_every_10 = print_every_10 + 1
+
+
 @shared_task()
 def periodicUpdateRate():
-    now = datetime.now()
-    print('Now: ', now)
-    for p in Player.objects.all():
-        print(p.screen_name)
+    now = timezone.make_aware(datetime.now())
+    second_in_hour = 60 * 60
+    print('periodicUpdateRate')
+    try:
+        rates = Rate.objects.all()
+        for rate in rates:
+            print(rate.name)
+            if rate.current_tokens < rate.per_hour/2:
+                extra_seconds = (second_in_hour / rate.per_hour) * 2
+                print('Extra s: ', extra_seconds)
+                if now > rate.last_token_added + timedelta(seconds = extra_seconds):
+                    print('New token needed for: ', rate.name)
+                    rate.current_tokens = rate.current_tokens + 1
+                    rate.last_token_added = now
+                    rate.save()
+            print('*#*')
+    except Exception as e: print(e)
