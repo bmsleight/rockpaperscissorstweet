@@ -1,12 +1,42 @@
 {% extends "base.html" %}
- 
-{% block content %}
+
+{% block extra_head %}
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="text/javascript">
+      google.charts.load('current', {'packages':['corechart']});
+      google.charts.setOnLoadCallback(drawChart);
+
+      function drawChart() {
+
+        var data = google.visualization.arrayToDataTable( {{data|safe}} );
+
+        var options = {
+          title: ' ',
+          backgroundColor: {fill:'#101214'},
+          legend: {textStyle: { color: 'white' } },
+          hAxis: {titleTextStyle: {color: 'white'}},
+          vAxis: {textStyle: {color: 'white'}},
+        };
+
+        {% if pie_chart %}
+            var chart = new google.visualization.PieChart(document.getElementById('piechart'));
+        {% elif bar_chart %}
+            var chart = new google.visualization.BarChart(document.getElementById('chart_div'));
+        {% endif %}
+        
+        
+        chart.draw(data, options);
+      }
+    </script>
 {% endblock %}
- 
+
 {% block other_content %}
-<script type="text/javascript" src="https://www.google.com/jsapi"></script>
-<script type="text/javascript">
-    google.load("visualization", "1", {packages:["corechart"]});
-</script>
-{{ chart.as_html }}
+    {% if pie_chart %}
+        <div id="piechart" style="width: 496px; height: 259px;"></div>
+    {% elif bar_chart %}
+        <div id="chart_div" style="width: 496px; height: 259px;"></div>
+    {% endif %}
+        
+    {% block description %}
+    {% endblock %}    
 {% endblock %}
