@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+ 
+{% block content %}
+{% if leader_md %}
+### Leaderboard Top Three
+{{ leader_md }}
+{% endif %}
+
+Click on any of the above users to challenge them and nudge them off the leaderboard.
+
+### All Winners Percentage
+<div class="well well-lg">
+   <embed type="image/svg+xml" src= {{ winners_percentage|safe }} />
+</div>
+
+### Percentage of #RockPaperScissors
+<div class="well well-lg">
+   <embed type="image/svg+xml" src= {{ choices_chart|safe }} />
+</div>
+
+<small>* Technically not including the drawn games.</small>
+
+
+### Each Player Total Number of Wins
+<div class="well well-lg">
+   <embed type="image/svg+xml" src= {{ winners_chart|safe }} />
+</div>
+
+
+{% endblock %}

@@ -20,8 +20,6 @@ from bot import views
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
-    url(r'^choices/', views.choices, name='choices'),
-    url(r'^winners/', views.winners, name='winners'),
-    url(r'^chart/', views.pchart, name='pchart'),
+    url(r'^dashboard/', views.dashboard, name='dashboard'),
     url(r'', include('django.contrib.flatpages.urls')),
 ]
